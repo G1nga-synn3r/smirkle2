@@ -151,20 +151,55 @@ export default function HomePage() {
     setVideoActive(true);
   };
 
-  const handleStop = () => {
+  const handleStop = useCallback(async () => {
+    // Save scores if user is logged in and has a score
+    if (currentUser && sessionScore > 0 && userProfile && !userProfile.isGuest) {
+      try {
+        // Update user scores in Firestore
+        await updateUserScores(currentUser.uid, sessionScore);
+        
+        // Save game session
+        await saveGameSession(currentUser.uid, {
+          userId: currentUser.uid,
+          score: sessionScore,
+          maxScore: sessionScore,
+          videoId: selectedVideo.id,
+          startTime: new Date(Date.now() - gameTime * 1000),
+          endTime: new Date(),
+          completed: !isFailed,
+          failReason: isFailed ? 'smiley_detected' : undefined,
+        });
+        
+        // Update local state
+        setLifetimeScore(prev => prev + sessionScore);
+        if (sessionScore > highScore) {
+          setHighScore(sessionScore);
+        }
+      } catch (error) {
+        console.error('Error saving scores:', error);
+      }
+    }
+    
     setIsReady(false);
     setVideoActive(false);
+    setShowFullscreenVideo(false);
     setGuardianActive(false);
+    setSessionScore(0);
     setScore(0);
     setGameTime(0);
     setIsFailed(false);
     setFailReason('');
     setRank('NOVICE');
+    setStartButtonClicked(false);
+    setEyesOpen(false);
+    setIsSmiling(false);
+    setFaceDetected(false);
+    setAllConditionsMet(false);
     
     if (gameTimerRef.current) {
       clearInterval(gameTimerRef.current);
     }
-  };
+  }, [currentUser, sessionScore, gameTime, userProfile, highScore, selectedVideo, isFailed]);
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
@@ -362,8 +397,72 @@ export default function HomePage() {
     return <LandingPage />;
   }
 
+  // Show TutorialOverlay after authentication
+  if (showTutorial) {
+    return (
+      <TutorialOverlay
+        isOpen={true}
+        onClose={() => setShowTutorial(false)}
+        userId={currentUser?.uid}
+        isRegisteredUser={!userProfile?.isGuest}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#080808] text-white relative overflow-hidden">
+      {/* Red Screen Effect on Failure */}
+      {isFailed && (
+        <div className="fixed inset-0 bg-[#FF003C] z-40 animate-pulse" />
+      )}
+
+      {/* Fullscreen Video with Camera Overlay */}
+      {showFullscreenVideo && videoActive && !isFailed && (
+        <div className="fixed inset-0 z-50 bg-black">
+          {/* Video Player */}
+          <video
+            ref={fullscreenVideoRef}
+            autoPlay
+            muted={isMuted}
+            loop
+            className="absolute inset-0 w-full h-full object-contain"
+          >
+            <source src="/video/gameplay.mp4" type="video/mp4" />
+          </video>
+          
+          {/* Camera Overlay - Small picture-in-picture style */}
+          <div className="absolute bottom-4 right-4 w-48 h-36 border-4 border-[#00FF9C] rounded-lg overflow-hidden shadow-brutal-mint">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+            {/* Camera overlay label */}
+            <div className="absolute top-1 left-1 bg-black/70 px-2 py-0.5 text-xs font-bold text-[#00FF9C]">
+              YOU
+            </div>
+          </div>
+
+          {/* Score Overlay */}
+          <div className="absolute top-4 left-4 bg-black/70 px-4 py-2 border-2 border-[#00FF9C]">
+            <span className="text-[#00FF9C] font-black text-2xl">
+              {sessionScore} PTS
+            </span>
+          </div>
+
+          {/* Stop Button */}
+          <button
+            onClick={() => setShowFullscreenVideo(false)}
+            className="absolute top-4 right-4 bg-[#FF003C] text-white font-black px-4 py-2 border-4 border-black hover:bg-red-600"
+          >
+            STOP
+          </button>
+        </div>
+      )}
+
       {/* Background animation */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#00FF41]/5 to-[#FF00F5]/5"></div>
       
@@ -533,11 +632,11 @@ export default function HomePage() {
               )}
 
               {/* Game Status Indicators */}
-              {isReady && !isFailed && (
+              {(videoActive || allConditionsMet) && !isFailed && (
                 <>
                   {/* Score */}
                   <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 text-xs font-bold rounded">
-                    <span className="text-[#00FF9C]">{score}</span>
+                    <span className="text-[#00FF9C]">{sessionScore}</span>
                     <span className="text-gray-400"> pts</span>
                   </div>
                   
@@ -570,19 +669,25 @@ export default function HomePage() {
         <div className="fixed bottom-20 left-0 right-0 px-4 z-30">
           {!isReady ? (
             <button
-              onClick={handleReady}
+              onClick={() => {
+                setStartButtonClicked(true);
+                setIsReady(true);
+                handleReady();
+              }}
+              disabled={!cameraActive || !faceDetectionReady}
               className="w-full py-6 text-2xl font-bold uppercase tracking-wider
                 bg-[#FF003C] text-white border-4 border-black
                 shadow-[0_0_30px_rgba(255,0,60,0.5)]
                 hover:bg-red-600 hover:shadow-[0_0_50px_rgba(255,0,60,0.8)]
                 active:scale-95 transition-all duration-200
+                disabled:opacity-50 disabled:cursor-not-allowed
                 clip-path-polygon:polygon(5% 0%, 100% 0%, 100% 85%, 95% 100%, 0% 100%, 0% 15%)"
               style={{
                 clipPath: 'polygon(5% 0%, 100% 0%, 100% 85%, 95% 100%, 0% 100%, 0% 15%)'
               }}
             >
               <Play className="w-8 h-8 inline-block mr-3" />
-              READY!
+              START GAME
             </button>
           ) : isFailed ? (
             <button
@@ -619,7 +724,7 @@ export default function HomePage() {
             <div className="mt-4 text-center">
               <div className="inline-flex items-center gap-3 px-4 py-2 bg-[#00FF9C]/20 border border-[#00FF9C] rounded-lg">
                 <TrendingUp className="w-5 h-5 text-[#00FF9C]" />
-                <span className="text-[#00FF9C] font-bold text-lg">Score: {score}</span>
+                <span className="text-[#00FF9C] font-bold text-lg">Score: {sessionScore}</span>
               </div>
             </div>
 
