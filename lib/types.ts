@@ -27,6 +27,7 @@ export interface UserProfile {
   badges: Badge[];
   isGuest: boolean;
   createdAt: Date;
+  skipTutorial?: boolean;
 }
 
 export interface AuthState {
@@ -211,12 +212,12 @@ export const EYE_OPEN_THRESHOLD = 0.5;
 
 export type NavSection = 
   | 'home' 
-  | 'play' 
-  | 'leaderboard' 
+  | 'leaderboards' 
+  | 'search' 
   | 'profile' 
-  | 'settings' 
-  | 'achievements' 
-  | 'help';
+  | 'friends' 
+  | 'submit' 
+  | 'settings';
 
 export interface NavItem {
   id: NavSection;
@@ -227,13 +228,105 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: 'home', path: '/' },
-  { id: 'play', label: 'Play', icon: 'play', path: '/play' },
-  { id: 'leaderboard', label: 'Leaderboard', icon: 'trophy', path: '/leaderboard' },
+  { id: 'leaderboards', label: 'Leaderboards', icon: 'trophy', path: '/leaderboards' },
+  { id: 'search', label: 'Search', icon: 'search', path: '/search' },
   { id: 'profile', label: 'Profile', icon: 'user', path: '/profile' },
+  { id: 'friends', label: 'Friends', icon: 'users', path: '/friends' },
+  { id: 'submit', label: 'Submit', icon: 'upload', path: '/submit' },
   { id: 'settings', label: 'Settings', icon: 'settings', path: '/settings' },
-  { id: 'achievements', label: 'Achievements', icon: 'award', path: '/achievements' },
-  { id: 'help', label: 'Help', icon: 'help-circle', path: '/help' },
 ];
+
+// ============================================
+// PROFILE TYPES
+// ============================================
+
+export type VisibilitySetting = 'public' | 'friends' | 'private';
+
+export interface UserProfileDetails {
+  fullName: string;
+  birthdate: Date | null;
+  avatar: string;
+  slogan: string;
+  location: string;
+  visibility: {
+    fullName: VisibilitySetting;
+    birthdate: VisibilitySetting;
+    avatar: VisibilitySetting;
+    slogan: VisibilitySetting;
+    location: VisibilitySetting;
+  };
+}
+
+export interface ProfileField {
+  key: keyof UserProfileDetails;
+  label: string;
+  editable: boolean;
+  type: 'text' | 'date' | 'image';
+}
+
+export const PROFILE_FIELDS: ProfileField[] = [
+  { key: 'fullName', label: 'Full Name', editable: true, type: 'text' },
+  { key: 'birthdate', label: 'Birthdate', editable: true, type: 'date' },
+  { key: 'avatar', label: 'Profile Picture', editable: true, type: 'image' },
+  { key: 'slogan', label: 'Slogan', editable: true, type: 'text' },
+  { key: 'location', label: 'Location', editable: true, type: 'text' },
+];
+
+// ============================================
+// FRIENDS TYPES
+// ============================================
+
+export type FriendStatus = 'none' | 'pending' | 'friends';
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+}
+
+export interface Friend {
+  id: string;
+  userId: string;
+  username: string;
+  avatar?: string;
+  level: number;
+  addedAt: Date;
+}
+
+// ============================================
+// SETTINGS TYPES
+// ============================================
+
+export interface UserSettings {
+  hapticFeedback: boolean;
+  volume: number;
+  videoQuality: 'low' | 'medium' | 'high' | 'auto';
+  darkMode: boolean;
+}
+
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+  hapticFeedback: true,
+  volume: 80,
+  videoQuality: 'auto',
+  darkMode: true,
+};
+
+// ============================================
+// VIDEO SUBMISSION TYPES
+// ============================================
+
+export interface VideoSubmission {
+  id: string;
+  userId: string;
+  youtubeUrl: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: Date;
+  reviewedAt?: Date;
+}
 
 // ============================================
 // VIDEO & CONTENT TYPES

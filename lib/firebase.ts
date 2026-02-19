@@ -14,7 +14,9 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
   updateProfile,
-  sendEmailVerification
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -75,7 +77,9 @@ export async function registerUser(
   email: string, 
   password: string, 
   username: string,
-  dateOfBirth: Date
+  dateOfBirth: Date,
+  firstName?: string,
+  lastName?: string
 ): Promise<{ user: FirebaseUser; profile: UserProfile }> {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const firebaseUser = userCredential.user;
@@ -99,6 +103,8 @@ export async function registerUser(
   
   await setDoc(doc(db, 'users', firebaseUser.uid), {
     ...profile,
+    firstName: firstName || '',
+    lastName: lastName || '',
     createdAt: serverTimestamp(),
     dateOfBirth: dateOfBirth.toISOString(),
   });
@@ -115,6 +121,52 @@ export async function loginUser(
 ): Promise<FirebaseUser> {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   return userCredential.user;
+}
+
+/**
+ * Sign in with Google
+ */
+export async function signInWithGoogle(): Promise<{ user: FirebaseUser; isNewUser: boolean }> {
+  const googleProvider = new GoogleAuthProvider();
+  const result = await signInWithPopup(auth, googleProvider);
+  const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+  return { user: result.user, isNewUser };
+}
+
+/**
+ * Create or update user profile after Google sign-in
+ */
+export async function createOrUpdateGoogleUserProfile(
+  userId: string,
+  username: string,
+  firstName?: string,
+  lastName?: string
+): Promise<UserProfile> {
+  const existingProfile = await getUserProfile(userId);
+  
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  const profile: UserProfile = {
+    id: userId,
+    username,
+    lifetimeScore: 0,
+    highScore: 0,
+    level: 1,
+    badges: [],
+    isGuest: false,
+    createdAt: new Date(),
+  };
+  
+  await setDoc(doc(db, 'users', userId), {
+    ...profile,
+    firstName: firstName || '',
+    lastName: lastName || '',
+    createdAt: serverTimestamp(),
+  });
+  
+  return profile;
 }
 
 /**
@@ -163,6 +215,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       badges: data.badges || [],
       isGuest: data.isGuest ?? false,
       createdAt: data.createdAt?.toDate() || new Date(),
+      skipTutorial: data.skipTutorial ?? false,
     };
   }
   

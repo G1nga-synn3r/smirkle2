@@ -15,7 +15,8 @@ import {
   CheckCircle,
   X,
   UserPlus,
-  ArrowRight
+  ArrowRight,
+  Chrome
 } from 'lucide-react';
 import { cn, validatePassword, validateUsername, isValidEmail, validateAge } from '@/lib/utils';
 import type { AuthState } from '@/lib/types';
@@ -24,8 +25,9 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGuestLogin: (username: string) => void;
-  onRegister: (email: string, password: string, username: string, dob: Date) => void;
+  onRegister: (email: string, password: string, username: string, dob: Date, firstName?: string, lastName?: string) => void;
   onLogin: (email: string, password: string) => void;
+  onGoogleLogin: () => void;
   authState: AuthState;
 }
 
@@ -37,6 +39,7 @@ export function AuthModal({
   onGuestLogin, 
   onRegister,
   onLogin,
+  onGoogleLogin,
   authState 
 }: AuthModalProps) {
   const [mode, setMode] = useState<AuthMode>('guest');
@@ -54,6 +57,9 @@ export function AuthModal({
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [registerUsername, setRegisterUsername] = useState('');
   const [registerDob, setRegisterDob] = useState('');
+  const [registerFirstName, setRegisterFirstName] = useState('');
+  const [registerLastName, setRegisterLastName] = useState('');
+  const [registerTermsAgreed, setRegisterTermsAgreed] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -76,6 +82,9 @@ export function AuthModal({
     setRegisterConfirmPassword('');
     setRegisterUsername('');
     setRegisterDob('');
+    setRegisterFirstName('');
+    setRegisterLastName('');
+    setRegisterTermsAgreed(false);
     setLoginEmail('');
     setLoginPassword('');
   };
@@ -117,6 +126,18 @@ export function AuthModal({
     e.preventDefault();
     setErrors({});
     
+    // Validate first name
+    if (!registerFirstName.trim()) {
+      setErrors({ firstName: 'First name is required' });
+      return;
+    }
+    
+    // Validate last name
+    if (!registerLastName.trim()) {
+      setErrors({ lastName: 'Last name is required' });
+      return;
+    }
+    
     // Validate email
     if (!isValidEmail(registerEmail)) {
       setErrors({ email: 'Please enter a valid email address' });
@@ -155,9 +176,15 @@ export function AuthModal({
       return;
     }
     
+    // Validate terms of service
+    if (!registerTermsAgreed) {
+      setErrors({ terms: 'You must agree to the terms of service' });
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      await onRegister(registerEmail, registerPassword, registerUsername, dob);
+      await onRegister(registerEmail, registerPassword, registerUsername, dob, registerFirstName, registerLastName);
       onClose();
     } catch (err) {
       setErrors({ general: err instanceof Error ? err.message : 'Registration failed' });
@@ -313,6 +340,24 @@ export function AuthModal({
               )}
             </button>
 
+            {/* Divider */}
+            <div className="flex items-center gap-4 pt-4">
+              <div className="flex-1 h-px bg-gray-700"></div>
+              <span className="text-gray-500 text-sm">OR</span>
+              <div className="flex-1 h-px bg-gray-700"></div>
+            </div>
+
+            {/* Google Login Button */}
+            <button
+              type="button"
+              onClick={onGoogleLogin}
+              disabled={isLoading}
+              className="neo-button neo-button--outline w-full mt-4"
+            >
+              <Chrome className="w-5 h-5 mr-2" />
+              Continue with Google
+            </button>
+
             <div className="text-center pt-4">
               <button
                 type="button"
@@ -328,6 +373,48 @@ export function AuthModal({
         {/* Register Form */}
         {mode === 'register' && (
           <form onSubmit={handleRegisterSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block font-bold mb-2 uppercase text-sm">
+                  First Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={registerFirstName}
+                    onChange={(e) => setRegisterFirstName(e.target.value)}
+                    placeholder="First name"
+                    className="neo-input w-full pl-12"
+                    maxLength={50}
+                  />
+                </div>
+                {errors.firstName && (
+                  <p className="text-[#FF003C] text-sm mt-1">{errors.firstName}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold mb-2 uppercase text-sm">
+                  Last Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={registerLastName}
+                    onChange={(e) => setRegisterLastName(e.target.value)}
+                    placeholder="Last name"
+                    className="neo-input w-full pl-12"
+                    maxLength={50}
+                  />
+                </div>
+                {errors.lastName && (
+                  <p className="text-[#FF003C] text-sm mt-1">{errors.lastName}</p>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="block font-bold mb-2 uppercase text-sm">
                 Username
@@ -448,6 +535,24 @@ export function AuthModal({
               </div>
             </div>
 
+            {/* Terms of Service */}
+            <div className="pt-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={registerTermsAgreed}
+                  onChange={(e) => setRegisterTermsAgreed(e.target.checked)}
+                  className="w-6 h-6 accent-[#00FF9C] mt-0.5"
+                />
+                <span className="text-sm">
+                  I agree to the <a href="#" className="text-[#00FF9C] underline">Terms of Service</a> and <a href="#" className="text-[#00FF9C] underline">Privacy Policy</a>
+                </span>
+              </label>
+              {errors.terms && (
+                <p className="text-[#FF003C] text-sm mt-1">{errors.terms}</p>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
@@ -515,6 +620,17 @@ export function AuthModal({
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </>
               )}
+            </button>
+
+            {/* Google Login Button */}
+            <button
+              type="button"
+              onClick={onGoogleLogin}
+              disabled={isLoading}
+              className="neo-button neo-button--outline w-full mt-4"
+            >
+              <Chrome className="w-5 h-5 mr-2" />
+              Continue with Google
             </button>
 
             <div className="text-center pt-4">

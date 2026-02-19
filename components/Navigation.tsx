@@ -8,12 +8,12 @@
 import { useState } from 'react';
 import { 
   Home, 
-  Play, 
   Trophy, 
+  Search, 
   User, 
-  Settings, 
-  Award, 
-  HelpCircle
+  Users,
+  Upload,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NavSection, NavItem } from '@/lib/types';
@@ -26,22 +26,22 @@ interface NavigationProps {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: 'home', path: '/' },
-  { id: 'play', label: 'Play', icon: 'play', path: '/play' },
-  { id: 'leaderboard', label: 'Rank', icon: 'trophy', path: '/leaderboard' },
+  { id: 'leaderboards', label: 'Leaderboards', icon: 'trophy', path: '/leaderboards' },
+  { id: 'search', label: 'Search', icon: 'search', path: '/search' },
   { id: 'profile', label: 'Profile', icon: 'user', path: '/profile' },
+  { id: 'friends', label: 'Friends', icon: 'users', path: '/friends' },
+  { id: 'submit', label: 'Submit', icon: 'upload', path: '/submit' },
   { id: 'settings', label: 'Settings', icon: 'settings', path: '/settings' },
-  { id: 'achievements', label: 'Badges', icon: 'award', path: '/achievements' },
-  { id: 'help', label: 'Help', icon: 'help-circle', path: '/help' },
 ];
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home,
-  play: Play,
   trophy: Trophy,
+  search: Search,
   user: User,
+  users: Users,
+  upload: Upload,
   settings: Settings,
-  award: Award,
-  'help-circle': HelpCircle,
 };
 
 // Hexagon shape using clip-path
