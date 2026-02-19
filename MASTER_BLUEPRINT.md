@@ -65,3 +65,49 @@ Levels 45, 90, 180: Custom badge names.
 Users Collection: username, email, dob, lifetime_score, high_score, level, badges[].
 
 Leaderboard: Global Top 100 (High Scores) and Lifetime Totals.
+
+8. Hardcore Gameplay Mechanics
+The Shadow Guardian (Active Monitoring): * Proximity Alert: If the bounding box of the face exceeds 80% of the stream (too close) or falls below 15% (too far), a yellow "glitch" border appears with the text "CALIBRATE DISTANCE".
+
+Lumen Check: If the AI detection confidence drops below 40% due to lighting, the video darkens, and a warning states "NEED MORE LIGHT".
+
+The "Moment of Smirk" (Fail State):
+
+Crimson Flash: The entire UI background switches to Electric Red (#FF003C) with a high-frequency strobe effect for the first 0.5s.
+
+The Failure Jolt: * Vibration: navigator.vibrate([200, 100, 200, 100, 500]) — a rhythmic "heartbeat" vibration that ends in a long buzz.
+
+Reset: Session score resets to zero immediately to maintain the "Hardcore" stakes.
+
+Fail Message: A random brutalist insult or message: "POKER FACE COMPROMISED," "WEAK MUSCLES DETECTED," or "LAUGHTER IS DEFEAT."
+
+9. Advanced Profile & Privacy
+Data Points: Profile Picture, Username, Display Name, Bio/Motto, Birthdate, Location, High Score.
+
+Privacy Tier System:
+
+Public: Username and High Score (Global Leaderboard visibility).
+
+Toggleable (Public/Friends/Private): Name, Location, Bio, and Birthdate.
+
+Private Only: Friends List and Email.
+
+Visual Flair: Profiles should use the "Hexagonal Clip" for the profile picture, mirroring the camera overlay during gameplay.
+
+10. Social: The "Smirk-Circle" Friend System
+Search Engine: A real-time Firestore search that queries by username or display name using the array-contains or a simple string-prefix match.
+
+Privacy: Friends lists are strictly private. You can see your friends, but others cannot see who you are friends with.
+
+Friend Utilities:
+
+Friend-Only Leaderboards: A toggle on the high-score page to see how you rank specifically against your "Smirk-Circle."
+
+🚀 Hackathon "Judge-Impressor" Suggestions
+The "Glitch" Effect: Use a CSS mix-blend-mode: exclusion on the fail screen. It makes the app look like a high-end cyberpunk terminal failing.
+
+Anonymous "Ghost" Mode: Allow users to play without an account, but show them a "Shadow Score"—a score that would have been on the leaderboard if they had signed up. This is a massive "conversion" tactic for judges.
+
+Low-Latency "Tiny" Model: Specifically mention you are using the TinyFaceDetector over the standard SSD Mobilenet v1 to save battery and ensure 60FPS on older mobile devices.
+
+Privacy Disclaimer Toast: When the camera turns on, show a small toast: "ENCRYPTED STREAM: No video data leaves this device." Judges love data privacy.

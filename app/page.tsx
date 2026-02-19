@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Play, Camera, Video, AlertTriangle, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Camera, Video, AlertTriangle, Volume2, VolumeX, Maximize2, Smile, Eye, Trophy, X, Zap, TrendingUp, Award, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Mock video data
@@ -9,16 +9,65 @@ const SAMPLE_VIDEOS = [
   { id: '1', title: 'Funny Cat Compilation', thumbnail: 'https://picsum.photos/seed/cat1/400/300' },
   { id: '2', title: 'Kids Saying Funny Things', thumbnail: 'https://picsum.photos/seed/kids2/400/300' },
   { id: '3', title: 'Pet Fails 2024', thumbnail: 'https://picsum.photos/seed/pets3/400/300' },
+  { id: '4', title: 'Epic Fails Compilation', thumbnail: 'https://picsum.photos/seed/fails4/400/300' },
+  { id: '5', title: 'Try Not To Laugh Challenge', thumbnail: 'https://picsum.photos/seed/laugh5/400/300' },
 ];
 
+// Face detection models
+const MODEL_URL = '/models/face-api.js-master/face-api.js-master/weights/';
+
 export default function HomePage() {
+  // Game state
   const [isReady, setIsReady] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [videoActive, setVideoActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(SAMPLE_VIDEOS[0]);
+  const [score, setScore] = useState(0);
+  const [gameTime, setGameTime] = useState(0);
+  const [isFailed, setIsFailed] = useState(false);
+  const [failReason, setFailReason] = useState('');
+  const [rank, setRank] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPip, setIsPip] = useState(false);
+  const [faceDetectionReady, setFaceDetectionReady] = useState(false);
+  const [guardianActive, setGuardianActive] = useState(false);
+  const [vibrationSupported, setVibrationSupported] = useState(false);
+
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gameTimerRef = useRef<NodeJS.Timeout>();
+  const faceDetectionRef = useRef<any>();
+  const pipWindowRef = useRef<Window>();
+
+  // Initialize vibration support
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      setVibrationSupported(true);
+    }
+  }, []);
+
+  // Load face detection models
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const loadModels = async () => {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+        ]);
+        setFaceDetectionReady(true);
+      } catch (error) {
+        console.error('Error loading face detection models:', error);
+      }
+    };
+
+    loadModels();
+  }, []);
 
   // Initialize camera
   useEffect(() => {
@@ -27,7 +76,7 @@ export default function HomePage() {
     const initCamera = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'user' },
+          video: { facingMode: 'user', width: 640, height: 480 },
           audio: false 
         });
         if (videoRef.current) {
@@ -40,7 +89,7 @@ export default function HomePage() {
       }
     };
 
-    if (isReady) {
+    if (isReady && faceDetectionReady) {
       initCamera();
     }
 
@@ -48,18 +97,122 @@ export default function HomePage() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
     };
-  }, [isReady]);
+  }, [isReady, faceDetectionReady]);
 
-  // Video loop simulation
+  // Start game
   useEffect(() => {
-    if (videoActive && !isMuted) {
-      const interval = setInterval(() => {
-        // Simulate video playing
-      }, 1000);
-      return () => clearInterval(interval);
+    if (isReady && cameraActive && faceDetectionReady) {
+      startGame();
     }
-  }, [videoActive, isMuted]);
+  }, [isReady, cameraActive, faceDetectionReady]);
+
+  // Face detection and guardian system
+  useEffect(() => {
+    if (!isReady || !cameraActive || !faceDetectionReady) return;
+
+    const detectFaces = async () => {
+      if (!videoRef.current || !canvasRef.current) return;
+
+      const displaySize = { width: 640, height: 480 };
+      faceapi.matchDimensions(canvasRef.current, displaySize);
+
+      const detections = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      if (detections) {
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        
+        // Check for smile
+        if (detections.expressions.happy > 0.5) {
+          handleFail('You smiled! Keep a straight face!');
+          return;
+        }
+
+        // Check for eyes closed
+        const leftEyeClosed = resizedDetections.landmarks.getLeftEye()[1].y > 
+                             resizedDetections.landmarks.getLeftEye()[5].y;
+        const rightEyeClosed = resizedDetections.landmarks.getRightEye()[1].y > 
+                              resizedDetections.landmarks.getRightEye()[5].y;
+        
+        if (leftEyeClosed && rightEyeClosed) {
+          handleFail('Your eyes are closed! Stay alert!');
+          return;
+        }
+
+        // Check if face is detected
+        if (!resizedDetections) {
+          handleFail('Face not detected! Make sure you are visible!');
+          return;
+        }
+
+        // Draw detection box
+        canvasRef.current.getContext('2d').clearRect(0, 0, 640, 480);
+        faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
+        faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetections);
+      }
+    };
+
+    const interval = setInterval(detectFaces, 100);
+    return () => clearInterval(interval);
+  }, [isReady, cameraActive, faceDetectionReady]);
+
+  // Game timer
+  useEffect(() => {
+    if (!isReady || isFailed) return;
+
+    gameTimerRef.current = setInterval(() => {
+      setGameTime(prev => prev + 1);
+      setScore(prev => prev + 10); // 10 points per second
+    }, 1000);
+
+    return () => {
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
+    };
+  }, [isReady, isFailed]);
+
+  // Update rank based on score
+  useEffect(() => {
+    if (score >= 5000) setRank('GOD');
+    else if (score >= 3000) setRank('MASTER');
+    else if (score >= 1000) setRank('PRO');
+    else if (score >= 500) setRank('ADVANCED');
+    else if (score >= 200) setRank('INTERMEDIATE');
+    else if (score >= 100) setRank('BEGINNER');
+    else setRank('NOVICE');
+  }, [score]);
+
+  const startGame = async () => {
+    setGuardianActive(true);
+    setScore(0);
+    setGameTime(0);
+    setIsFailed(false);
+    setFailReason('');
+    setRank('NOVICE');
+  };
+
+  const handleFail = (reason: string) => {
+    setIsFailed(true);
+    setFailReason(reason);
+    setGuardianActive(false);
+    
+    // Trigger vibration
+    if (vibrationSupported) {
+      navigator.vibrate([100, 200, 100]);
+    }
+    
+    // Stop game timer
+    if (gameTimerRef.current) {
+      clearInterval(gameTimerRef.current);
+    }
+  };
 
   const handleReady = () => {
     setIsReady(true);
@@ -69,19 +222,73 @@ export default function HomePage() {
   const handleStop = () => {
     setIsReady(false);
     setVideoActive(false);
+    setGuardianActive(false);
+    setScore(0);
+    setGameTime(0);
+    setIsFailed(false);
+    setFailReason('');
+    setRank('NOVICE');
+    
+    if (gameTimerRef.current) {
+      clearInterval(gameTimerRef.current);
+    }
   };
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error('Fullscreen error:', err);
+      });
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const togglePip = async () => {
+    if (!videoRef.current) return;
+
+    try {
+      if (!isPip) {
+        await videoRef.current.requestPictureInPicture();
+        setIsPip(true);
+      } else {
+        await document.exitPictureInPicture();
+        setIsPip(false);
+      }
+    } catch (error) {
+      console.error('PIP error:', error);
+    }
+  };
+
+  const getRankColor = () => {
+    const rankColors = {
+      'GOD': '#00FF41',
+      'MASTER': '#00D4FF',
+      'PRO': '#FF00F5',
+      'ADVANCED': '#FF8C00',
+      'INTERMEDIATE': '#FFFF00',
+      'BEGINNER': '#FF0000',
+      'NOVICE': '#808080'
+    };
+    return rankColors[rank as keyof typeof rankColors] || '#FFFFFF';
+  };
+
   return (
-    <div className="min-h-screen bg-[#080808] text-white">
+    <div className="min-h-screen bg-[#080808] text-white relative overflow-hidden">
+      {/* Background animation */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#00FF41]/5 to-[#FF00F5]/5"></div>
+      
       {/* Main Content */}
-      <div className="p-4 pb-28">
+      <div className="p-4 pb-28 relative z-10">
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-3xl font-bold text-[#00FF9C] glow-mint">
+          <h1 className="text-4xl font-bold text-[#00FF9C] glow-mint mb-2">
             SMIRKLE2
           </h1>
           <p className="text-gray-400 text-sm">Don't Laugh Challenge</p>
@@ -98,6 +305,19 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* Guardian System Status */}
+        {guardianActive && (
+          <div className="neo-card mb-4 bg-[#00FF41]/20 border-[#00FF41] border-2">
+            <div className="flex items-center gap-3 p-3">
+              <Shield className="w-5 h-5 text-[#00FF41]" />
+              <div className="flex-1">
+                <p className="font-bold text-[#00FF41] text-sm">GUARDIAN SYSTEM ACTIVE</p>
+                <p className="text-gray-400 text-xs">Monitoring your face...</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Split Screen Interface */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -122,6 +342,36 @@ export default function HomePage() {
                   </div>
                 </div>
               )}
+
+              {/* Control Buttons */}
+              <div className="absolute top-2 left-2 flex gap-2">
+                <button
+                  onClick={toggleMute}
+                  className="w-8 h-8 bg-black/70 border border-black flex items-center justify-center hover:bg-black transition-colors"
+                >
+                  {isMuted ? (
+                    <VolumeX className="w-4 h-4 text-white" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-white" />
+                  )}
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className="w-8 h-8 bg-black/70 border border-black flex items-center justify-center hover:bg-black transition-colors"
+                >
+                  <Maximize2 className="w-4 h-4 text-white" />
+                </button>
+                <button
+                  onClick={togglePip}
+                  className="w-8 h-8 bg-black/70 border border-black flex items-center justify-center hover:bg-black transition-colors"
+                >
+                  <div className="w-4 h-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  </div>
+                </button>
+              </div>
 
               {/* Mute Button */}
               <button
@@ -150,8 +400,10 @@ export default function HomePage() {
                     key={video.id}
                     onClick={() => setSelectedVideo(video)}
                     className={cn(
-                      "flex-shrink-0 w-20 h-14 bg-black border-2 overflow-hidden",
-                      selectedVideo.id === video.id ? "border-[#00FF9C]" : "border-transparent opacity-50"
+                      "flex-shrink-0 w-20 h-14 bg-black border-2 overflow-hidden cursor-pointer transition-all duration-200",
+                      selectedVideo.id === video.id 
+                        ? "border-[#00FF9C] transform scale-105 shadow-[0_0_20px_rgba(0,255,156,0.5)]"
+                        : "border-transparent opacity-50 hover:border-gray-600 hover:opacity-75"
                     )}
                   >
                     <img 
@@ -169,13 +421,16 @@ export default function HomePage() {
           <div className="neo-card p-0 overflow-hidden">
             <div className="bg-black aspect-video relative">
               {cameraActive ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                  <canvas ref={canvasRef} className="absolute inset-0" width={640} height={480} />
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center">
@@ -192,6 +447,22 @@ export default function HomePage() {
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                   <span className="text-xs font-bold">LIVE</span>
                 </div>
+              )}
+
+              {/* Game Status Indicators */}
+              {isReady && !isFailed && (
+                <>
+                  {/* Score */}
+                  <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 text-xs font-bold rounded">
+                    <span className="text-[#00FF9C]">{score}</span>
+                    <span className="text-gray-400"> pts</span>
+                  </div>
+                  
+                  {/* Time */}
+                  <div className="absolute top-2 left-2 bg-black/70 px-2 py-1 text-xs font-bold rounded">
+                    <span className="text-[#FF00F5]">{Math.floor(gameTime / 60)}:{String(gameTime % 60).padStart(2, '0')}</span>
+                  </div>
+                </>
               )}
 
               {/* Camera Label */}
@@ -230,6 +501,18 @@ export default function HomePage() {
               <Play className="w-8 h-8 inline-block mr-3" />
               READY!
             </button>
+          ) : isFailed ? (
+            <button
+              onClick={handleStop}
+              className="w-full py-4 text-xl font-bold uppercase tracking-wider
+                bg-[#FF003C] text-white border-4 border-black
+                shadow-[0_0_30px_rgba(255,0,60,0.5)]
+                hover:bg-red-600 hover:shadow-[0_0_50px_rgba(255,0,60,0.8)]
+                active:scale-95 transition-all duration-200"
+            >
+              <X className="w-6 h-6 inline-block mr-3" />
+              FAILED
+            </button>
           ) : (
             <button
               onClick={handleStop}
@@ -248,14 +531,52 @@ export default function HomePage() {
 
         {/* Game Status */}
         {isReady && (
-          <div className="mt-4 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#00FF9C]/20 border border-[#00FF9C]">
-              <div className="w-2 h-2 bg-[#00FF9C] rounded-full animate-pulse"></div>
-              <span className="text-[#00FF9C] font-bold">Game ready! Keep a straight face!</span>
+          <>
+            {/* Score Display */}
+            <div className="mt-4 text-center">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-[#00FF9C]/20 border border-[#00FF9C] rounded-lg">
+                <TrendingUp className="w-5 h-5 text-[#00FF9C]" />
+                <span className="text-[#00FF9C] font-bold text-lg">Score: {score}</span>
+              </div>
             </div>
-          </div>
+
+            {/* Rank Display */}
+            {rank && (
+              <div className="mt-2 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF00F5]/20 border border-[#FF00F5] rounded-lg">
+                  <Award className="w-5 h-5 text-[#FF00F5]" />
+                  <span className="text-[#FF00F5] font-bold text-lg">Rank: {rank}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Fail Message */}
+            {isFailed && (
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500 rounded-lg">
+                  <X className="w-5 h-5 text-red-500" />
+                  <span className="text-red-500 font-bold text-lg">{failReason}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Game Ready Status */}
+            {!isFailed && (
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#00FF9C]/20 border border-[#00FF9C]">
+                  <div className="w-2 h-2 bg-[#00FF9C] rounded-full animate-pulse"></div>
+                  <span className="text-[#00FF9C] font-bold">Game active! Keep a straight face!</span>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* Fullscreen Background */}
+      {isFullscreen && (
+        <div className="fixed inset-0 bg-black z-0"></div>
+      )}
     </div>
   );
 }
