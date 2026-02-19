@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin"; // Import the plugin helper
 
 const config: Config = {
   content: [
@@ -23,6 +24,14 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(function({ addUtilities }) {
+      addUtilities({
+        '.clip-hexagon': {
+          'clip-path': 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)',
+        },
+      })
+    }),
+  ],
 };
 export default config;

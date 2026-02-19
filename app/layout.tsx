@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "SMIRKLE2 - Don't Laugh Challenge",
@@ -22,7 +23,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#080808" />
       </head>
       <body className="antialiased">
-        {children}
+        <AppShell>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

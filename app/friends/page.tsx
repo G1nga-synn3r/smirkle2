@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Users, User, ChevronRight, UserPlus, MessageSquare } from 'lucide-react';
+import { Users, User, ChevronRight, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -24,7 +23,7 @@ const MOCK_FRIENDS: Friend[] = [
 ];
 
 export default function FriendsPage() {
-  const [friends] = useState<Friend[]>(MOCK_FRIENDS);
+  const friends = MOCK_FRIENDS;
   const onlineFriends = friends.filter(f => f.isOnline);
   const offlineFriends = friends.filter(f => !f.isOnline);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, Video, AlertCircle, Check, Clock, Link as LinkIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -117,7 +117,7 @@ export default function SubmitPage() {
             <div>
               <h3 className="font-bold text-green-500">Submission Received!</h3>
               <p className="text-sm text-gray-400">
-                Your video has been submitted for review. You'll be notified when it's approved.
+                Your video has been submitted for review. You&apos;ll be notified when it&apos;s approved.
               </p>
             </div>
           </div>
@@ -138,9 +138,12 @@ export default function SubmitPage() {
             onChange={(e) => handleChange('youtubeUrl', e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..."
             className="neo-input w-full"
+            aria-label="YouTube URL"
+            aria-invalid={!!errors.youtubeUrl}
+            aria-describedby={errors.youtubeUrl ? "youtube-url-error" : undefined}
           />
           {errors.youtubeUrl && (
-            <p className="text-red-500 text-sm mt-1">{errors.youtubeUrl}</p>
+            <p id="youtube-url-error" className="text-red-500 text-sm mt-1" role="alert">{errors.youtubeUrl}</p>
           )}
           {formData.youtubeUrl && !errors.youtubeUrl && validateYouTubeUrl(formData.youtubeUrl) && (
             <div className="mt-2">
@@ -150,9 +153,10 @@ export default function SubmitPage() {
                   width="100%"
                   height="100%"
                   src={`https://www.youtube.com/embed/${extractVideoId(formData.youtubeUrl)}`}
-                  title="Video preview"
+                  title={`Preview of ${formData.title || 'YouTube video'}`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
+                  aria-label={`Preview of video: ${formData.title || 'YouTube video'}`}
                 />
               </div>
             </div>
@@ -171,9 +175,12 @@ export default function SubmitPage() {
             onChange={(e) => handleChange('title', e.target.value)}
             placeholder="Enter video title..."
             className="neo-input w-full"
+            aria-label="Video title"
+            aria-invalid={!!errors.title}
+            aria-describedby={errors.title ? "title-error" : undefined}
           />
           {errors.title && (
-            <p className="text-red-500 text-sm mt-1">{errors.title}</p>
+            <p id="title-error" className="text-red-500 text-sm mt-1" role="alert">{errors.title}</p>
           )}
           <p className="text-xs text-gray-500 mt-1">{formData.title.length}/100 characters</p>
         </div>
@@ -189,9 +196,12 @@ export default function SubmitPage() {
             placeholder="Describe the video..."
             rows={4}
             className="neo-input w-full resize-none"
+            aria-label="Video description"
+            aria-invalid={!!errors.description}
+            aria-describedby={errors.description ? "description-error" : undefined}
           />
           {errors.description && (
-            <p className="text-red-500 text-sm mt-1">{errors.description}</p>
+            <p id="description-error" className="text-red-500 text-sm mt-1" role="alert">{errors.description}</p>
           )}
           <p className="text-xs text-gray-500 mt-1">{formData.description.length}/500 characters</p>
         </div>
@@ -227,7 +237,7 @@ export default function SubmitPage() {
         </h3>
         <p className="text-sm text-gray-500">
           All video submissions go through an approval process before being added to the library. 
-          This helps ensure all content is appropriate for the challenge. You'll receive a notification 
+          This helps ensure all content is appropriate for the challenge. You&apos;ll receive a notification 
           once your video has been reviewed.
         </p>
       </div>

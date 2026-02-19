@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trophy, Crown, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Trophy, Crown, ChevronDown, ChevronUp, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type LeaderboardTab = 'session' | 'lifetime';
@@ -129,7 +129,7 @@ export default function LeaderboardsPage() {
               {entry.avatar ? (
                 <img src={entry.avatar} alt={entry.username} className="w-full h-full object-cover" />
               ) : (
-                <User className="w-6 h-6 text-gray-500" />
+                <UserIcon className="w-6 h-6 text-gray-500" />
               )}
             </div>
 

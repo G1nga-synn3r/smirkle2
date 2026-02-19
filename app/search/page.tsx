@@ -125,7 +125,7 @@ export default function SearchPage() {
           {searchResults.length === 0 ? (
             <div className="neo-card text-center py-8">
               <User className="w-12 h-12 mx-auto text-gray-500 mb-4" />
-              <p className="text-gray-400">No players found matching "{searchQuery}"</p>
+              <p className="text-gray-400">No players found matching &ldquo;{searchQuery}&rdquo;</p>
             </div>
           ) : (
             searchResults.map((result) => (

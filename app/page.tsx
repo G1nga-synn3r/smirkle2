@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Camera, Video, AlertTriangle, Volume2, VolumeX, Maximize2, Smile, Eye, Trophy, X, Zap, TrendingUp, Award, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as faceapi from 'face-api.js';
+import { onAuthChange, getUserProfile, updateUserScores, saveGameSession } from '@/lib/firebase';
+import LandingPage from '@/components/LandingPage';
+import TutorialOverlay from '@/components/TutorialOverlay';
+import type { UserProfile } from '@/lib/types';
+import type { User as FirebaseAuthUser } from 'firebase/auth';
 
 // Mock video data
 const SAMPLE_VIDEOS = [
@@ -24,6 +30,9 @@ export default function HomePage() {
   const [isMuted, setIsMuted] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(SAMPLE_VIDEOS[0]);
   const [score, setScore] = useState(0);
+  const [lifetimeScore, setLifetimeScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [sessionScore, setSessionScore] = useState(0);
   const [gameTime, setGameTime] = useState(0);
   const [isFailed, setIsFailed] = useState(false);
   const [failReason, setFailReason] = useState('');
@@ -34,12 +43,55 @@ export default function HomePage() {
   const [guardianActive, setGuardianActive] = useState(false);
   const [vibrationSupported, setVibrationSupported] = useState(false);
 
+  // Strict activation states - ALL must be true for video to play
+  const [eyesOpen, setEyesOpen] = useState(false);
+  const [isSmiling, setIsSmiling] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [startButtonClicked, setStartButtonClicked] = useState(false);
+  const [allConditionsMet, setAllConditionsMet] = useState(false);
+
+  // Fullscreen video player
+  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
+  const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
+
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameTimerRef = useRef<NodeJS.Timeout>();
-  const faceDetectionRef = useRef<any>();
-  const pipWindowRef = useRef<Window>();
+  const gameTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const faceDetectionRef = useRef<faceapi.FaceDetection | null>(null);
+  const pipWindowRef = useRef<Window | null>(null);
+
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<FirebaseAuthUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Listen for auth changes and load user profile
+  useEffect(() => {
+    const unsubscribe = onAuthChange(async (user) => {
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+      
+      if (user) {
+        // Load user profile
+        const profile = await getUserProfile(user.uid);
+        setUserProfile(profile);
+        setLifetimeScore(profile?.lifetimeScore || 0);
+        setHighScore(profile?.highScore || 0);
+        
+        // Check if should show tutorial
+        const hideTutorial = localStorage.getItem('hideSmirkleTutorial');
+        if (hideTutorial !== 'true') {
+          setShowTutorial(true);
+        }
+      } else {
+        setUserProfile(null);
+        setShowTutorial(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Initialize vibration support
   useEffect(() => {
@@ -68,126 +120,6 @@ export default function HomePage() {
 
     loadModels();
   }, []);
-
-  // Initialize camera
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const initCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'user', width: 640, height: 480 },
-          audio: false 
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setCameraActive(true);
-      } catch (err) {
-        console.error('Camera error:', err);
-        setCameraActive(false);
-      }
-    };
-
-    if (isReady && faceDetectionReady) {
-      initCamera();
-    }
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (gameTimerRef.current) {
-        clearInterval(gameTimerRef.current);
-      }
-    };
-  }, [isReady, faceDetectionReady]);
-
-  // Start game
-  useEffect(() => {
-    if (isReady && cameraActive && faceDetectionReady) {
-      startGame();
-    }
-  }, [isReady, cameraActive, faceDetectionReady]);
-
-  // Face detection and guardian system
-  useEffect(() => {
-    if (!isReady || !cameraActive || !faceDetectionReady) return;
-
-    const detectFaces = async () => {
-      if (!videoRef.current || !canvasRef.current) return;
-
-      const displaySize = { width: 640, height: 480 };
-      faceapi.matchDimensions(canvasRef.current, displaySize);
-
-      const detections = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceExpressions();
-
-      if (detections) {
-        const resizedDetections = faceapi.resizeResults(detections, displaySize);
-        
-        // Check for smile
-        if (detections.expressions.happy > 0.5) {
-          handleFail('You smiled! Keep a straight face!');
-          return;
-        }
-
-        // Check for eyes closed
-        const leftEyeClosed = resizedDetections.landmarks.getLeftEye()[1].y > 
-                             resizedDetections.landmarks.getLeftEye()[5].y;
-        const rightEyeClosed = resizedDetections.landmarks.getRightEye()[1].y > 
-                              resizedDetections.landmarks.getRightEye()[5].y;
-        
-        if (leftEyeClosed && rightEyeClosed) {
-          handleFail('Your eyes are closed! Stay alert!');
-          return;
-        }
-
-        // Check if face is detected
-        if (!resizedDetections) {
-          handleFail('Face not detected! Make sure you are visible!');
-          return;
-        }
-
-        // Draw detection box
-        canvasRef.current.getContext('2d').clearRect(0, 0, 640, 480);
-        faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
-        faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetections);
-      }
-    };
-
-    const interval = setInterval(detectFaces, 100);
-    return () => clearInterval(interval);
-  }, [isReady, cameraActive, faceDetectionReady]);
-
-  // Game timer
-  useEffect(() => {
-    if (!isReady || isFailed) return;
-
-    gameTimerRef.current = setInterval(() => {
-      setGameTime(prev => prev + 1);
-      setScore(prev => prev + 10); // 10 points per second
-    }, 1000);
-
-    return () => {
-      if (gameTimerRef.current) {
-        clearInterval(gameTimerRef.current);
-      }
-    };
-  }, [isReady, isFailed]);
-
-  // Update rank based on score
-  useEffect(() => {
-    if (score >= 5000) setRank('GOD');
-    else if (score >= 3000) setRank('MASTER');
-    else if (score >= 1000) setRank('PRO');
-    else if (score >= 500) setRank('ADVANCED');
-    else if (score >= 200) setRank('INTERMEDIATE');
-    else if (score >= 100) setRank('BEGINNER');
-    else setRank('NOVICE');
-  }, [score]);
 
   const startGame = async () => {
     setGuardianActive(true);
@@ -279,6 +211,157 @@ export default function HomePage() {
     return rankColors[rank as keyof typeof rankColors] || '#FFFFFF';
   };
 
+  // Initialize camera
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+
+    const initCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: 640, height: 480 },
+          audio: false 
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setCameraActive(true);
+      } catch (err) {
+        console.error('Camera error:', err);
+        setCameraActive(false);
+      }
+    };
+
+    if (isReady && faceDetectionReady) {
+      initCamera();
+    }
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
+    };
+  }, [isReady, faceDetectionReady]);
+
+  // Check if all strict activation conditions are met
+  useEffect(() => {
+    const conditionsMet = eyesOpen && !isSmiling && faceDetected && startButtonClicked;
+    setAllConditionsMet(conditionsMet);
+    
+    // If all conditions met, start video and scoring
+    if (conditionsMet && !videoActive) {
+      setVideoActive(true);
+      setGuardianActive(true);
+    } else if (!conditionsMet && videoActive && !isFailed) {
+      // If conditions not met and video was playing, stop it
+      setVideoActive(false);
+    }
+  }, [eyesOpen, isSmiling, faceDetected, startButtonClicked, videoActive, isFailed]);
+
+  // Face detection and guardian system
+  useEffect(() => {
+    if (!isReady || !cameraActive || !faceDetectionReady) return;
+
+    const detectFaces = async () => {
+      if (!videoRef.current || !canvasRef.current) return;
+
+      const displaySize = { width: 640, height: 480 };
+      faceapi.matchDimensions(canvasRef.current, displaySize);
+
+      const detections = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      if (detections) {
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        
+        // Update face detection states for strict activation
+        setFaceDetected(true);
+        
+        // Check for smile
+        const smiling = detections.expressions.happy > 0.5;
+        setIsSmiling(smiling);
+        if (smiling) {
+          handleFail('You smiled! Keep a straight face!');
+          return;
+        }
+
+        // Check for eyes closed
+        const leftEye = resizedDetections.landmarks.getLeftEye();
+        const rightEye = resizedDetections.landmarks.getRightEye();
+        const leftEyeClosed = leftEye[1].y > leftEye[5].y;
+        const rightEyeClosed = rightEye[1].y > rightEye[5].y;
+        const eyesAreOpen = !leftEyeClosed && !rightEyeClosed;
+        setEyesOpen(eyesAreOpen);
+        
+        if (!eyesAreOpen) {
+          handleFail('Your eyes are closed! Stay alert!');
+          return;
+        }
+
+        // Draw detection box
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, 640, 480);
+          faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
+          faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetections);
+        }
+      } else {
+        setFaceDetected(false);
+        setEyesOpen(false);
+      }
+    };
+
+    const interval = setInterval(detectFaces, 100);
+    return () => clearInterval(interval);
+  }, [isReady, cameraActive, faceDetectionReady]);
+
+  // Game scoring - runs while video is active
+  useEffect(() => {
+    if (!videoActive || isFailed) return;
+
+    gameTimerRef.current = setInterval(() => {
+      setGameTime(prev => prev + 1);
+      setSessionScore(prev => prev + 10); // 10 points per second while video plays
+    }, 1000);
+
+    return () => {
+      if (gameTimerRef.current) {
+        clearInterval(gameTimerRef.current);
+      }
+    };
+  }, [videoActive, isFailed]);
+
+  // Update rank based on score
+  useEffect(() => {
+    if (score >= 5000) setRank('GOD');
+    else if (score >= 3000) setRank('MASTER');
+    else if (score >= 1000) setRank('PRO');
+    else if (score >= 500) setRank('ADVANCED');
+    else if (score >= 200) setRank('INTERMEDIATE');
+    else if (score >= 100) setRank('BEGINNER');
+    else setRank('NOVICE');
+  }, [score]);
+
+  // Show loading while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+        <div className="text-[#00FF9C] text-2xl font-black animate-pulse">
+          LOADING...
+        </div>
+      </div>
+    );
+  }
+
+  // Show LandingPage if not authenticated
+  if (!currentUser) {
+    return <LandingPage />;
+  }
+
   return (
     <div className="min-h-screen bg-[#080808] text-white relative overflow-hidden">
       {/* Background animation */}
@@ -291,7 +374,7 @@ export default function HomePage() {
           <h1 className="text-4xl font-bold text-[#00FF9C] glow-mint mb-2">
             SMIRKLE2
           </h1>
-          <p className="text-gray-400 text-sm">Don't Laugh Challenge</p>
+          <p className="text-gray-400 text-sm">Don&apos;t Laugh Challenge</p>
         </div>
 
         {/* Instructions Banner */}
