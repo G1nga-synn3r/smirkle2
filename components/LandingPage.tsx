@@ -9,11 +9,28 @@ import {
   signInAsGuest,
   createOrUpdateGoogleUserProfile,
   createGuestProfile,
+  onAuthChange,
 } from "@/lib/firebase";
+import { cn, validateAge, validatePassword, validateUsername } from "@/lib/utils";
+import type { UserProfile } from "@/lib/types";
+import type { User as FirebaseUser } from "firebase/auth";
 
 // ============================================
 // TYPES
 // ============================================
+
+export interface LandingPageProps {
+  /** Callback when user successfully authenticates */
+  onAuthSuccess?: (user: FirebaseUser, profile?: UserProfile) => void;
+  /** Callback when user wants to start tutorial */
+  onStartTutorial?: () => void;
+  /** Initial auth tab to show */
+  initialTab?: "join" | "return" | "ghost";
+  /** Whether to show tutorial after auth */
+  showTutorialOnAuth?: boolean;
+  /** Custom redirect path after successful auth */
+  redirectPath?: string;
+}
 
 type AuthTab = "join" | "return" | "ghost";
 
@@ -41,9 +58,15 @@ const PASSWORD_REGEX = {
 // MAIN COMPONENT
 // ============================================
 
-export default function LandingPage() {
+export default function LandingPage({
+  onAuthSuccess,
+  onStartTutorial,
+  initialTab = "join",
+  showTutorialOnAuth = false,
+  redirectPath = "/",
+}: LandingPageProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AuthTab>("join");
+  const [activeTab, setActiveTab] = useState<AuthTab>(initialTab);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCRT, setShowCRT] = useState(false);
@@ -103,7 +126,7 @@ export default function LandingPage() {
   const triggerCRTEffect = async () => {
     setShowCRT(true);
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    router.push("/");
+    router.push(redirectPath);
   };
 
   // ============================================
@@ -574,14 +597,14 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={isLoading || isUnderAge}
-                  className="w-full bg-gray-600 text-white font-black text-xl py-4 border-4 border-black shadow-brutal hover:translate-x-1 hover:translate-y-1 hover:shadow-none disabled:opacity-50 disabled:cursor-not-allowed -rotate-2"
+                  className={cn(
+                    "w-full bg-gray-600 text-white font-black text-xl py-4 border-4 border-black shadow-brutal",
+                    "hover:translate-x-1 hover:translate-y-1 hover:shadow-none",
+                    "disabled:opacity-50 disabled:cursor-not-allowed -rotate-2"
+                  )}
                 >
-                  {isLoading ? "PHANTOM FORMING..." : "ENTER AS GHOST"}
+                  {isLoading ? "PHANTOM FORMING..." : "ENTER AS GHOST (No Glory/No Saved Scores)"}
                 </button>
-
-                <p className="text-gray-400 text-sm font-bold text-center">
-                  (No Glory. No Saved Scores.)
-                </p>
               </form>
             )}
           </div>
