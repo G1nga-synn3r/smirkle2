@@ -69,13 +69,23 @@ export default function HomePage() {
 
   // Listen for auth changes and load user profile
   useEffect(() => {
+    console.log('[Auth] Setting up auth listener');
+    console.log('[Auth] Firebase config check:', {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'set' : 'missing',
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? 'set' : 'missing',
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? 'set' : 'missing',
+    });
+    
     const unsubscribe = onAuthChange(async (user) => {
+      console.log('[Auth] Auth state changed:', user ? `User: ${user.uid}` : 'No user');
       setCurrentUser(user);
       setIsAuthLoading(false);
       
       if (user) {
+        console.log('[Auth] Loading user profile for:', user.uid);
         // Load user profile
         const profile = await getUserProfile(user.uid);
+        console.log('[Auth] User profile loaded:', profile ? 'found' : 'not found');
         setUserProfile(profile);
         setLifetimeScore(profile?.lifetimeScore || 0);
         setHighScore(profile?.highScore || 0);
@@ -83,9 +93,11 @@ export default function HomePage() {
         // Check if should show tutorial
         const hideTutorial = localStorage.getItem('hideSmirkleTutorial');
         if (hideTutorial !== 'true') {
+          console.log('[Auth] Showing tutorial');
           setShowTutorial(true);
         }
       } else {
+        console.log('[Auth] No user, clearing profile');
         setUserProfile(null);
         setShowTutorial(false);
       }
@@ -382,6 +394,42 @@ export default function HomePage() {
   }, [score]);
 
   // Show loading while checking auth
+  console.log('[Render] isAuthLoading:', isAuthLoading, 'currentUser:', currentUser ? currentUser.uid : null, 'showTutorial:', showTutorial);
+  
+  // Check if Firebase is properly configured
+  const isFirebaseConfigured = !(
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY === undefined ||
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'demo-api-key' ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === undefined ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === 'smirkle2-demo'
+  );
+  
+  if (!isFirebaseConfigured) {
+    console.error('[Firebase] Not configured! Environment variables missing on Vercel');
+    return (
+      <div className="min-h-screen bg-[#080808] flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-2xl font-black mb-4">
+            CONFIGURATION ERROR
+          </div>
+          <div className="text-white mb-4">
+            Firebase environment variables are not configured. Please add them to your Vercel project settings.
+          </div>
+          <div className="text-gray-400 text-sm">
+            Required variables:
+            <ul className="mt-2 text-left">
+              <li>• NEXT_PUBLIC_FIREBASE_API_KEY</li>
+              <li>• NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</li>
+              <li>• NEXT_PUBLIC_FIREBASE_PROJECT_ID</li>
+              <li>• NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET</li>
+              <li>• NEXT_PUBLIC_FIREBASE_APP_ID</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">

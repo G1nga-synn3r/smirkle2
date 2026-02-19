@@ -461,7 +461,11 @@ export default function LandingPage({
                 <button
                   type="submit"
                   disabled={isLoading || isUnderAge}
-                  className="w-full bg-smirkleMint text-black font-black text-xl py-4 border-4 border-black shadow-brutal hover:translate-x-1 hover:translate-y-1 hover:shadow-none disabled:opacity-50 disabled:cursor-not-allowed -rotate-1"
+                  className={cn(
+                    "w-full bg-smirkleMint text-black font-black text-xl py-4 border-4 border-black shadow-brutal",
+                    "hover:translate-x-1 hover:translate-y-1 hover:shadow-none",
+                    "disabled:opacity-50 disabled:cursor-not-allowed -rotate-1"
+                  )}
                 >
                   {isLoading ? "PROCESSING..." : "JOIN THE ELITE"}
                 </button>
@@ -526,7 +530,11 @@ export default function LandingPage({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-smirkleMint text-black font-black text-xl py-4 border-4 border-black shadow-brutal hover:translate-x-1 hover:translate-y-1 hover:shadow-none disabled:opacity-50 disabled:cursor-not-allowed rotate-1"
+                  className={cn(
+                    "w-full bg-smirkleMint text-black font-black text-xl py-4 border-4 border-black shadow-brutal",
+                    "hover:translate-x-1 hover:translate-y-1 hover:shadow-none",
+                    "disabled:opacity-50 disabled:cursor-not-allowed rotate-1"
+                  )}
                 >
                   {isLoading ? "WELCOME BACK..." : "ENTER AS PRO"}
                 </button>
@@ -543,7 +551,11 @@ export default function LandingPage({
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading}
-                  className="w-full bg-white text-black font-black text-lg py-4 border-4 border-black shadow-brutal-mint hover:translate-x-1 hover:translate-y-1 hover:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={cn(
+                    "w-full bg-white text-black font-black text-lg py-4 border-4 border-black shadow-brutal-mint",
+                    "hover:translate-x-1 hover:translate-y-1 hover:shadow-none",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
                 >
                   {isLoading ? "CONNECTING..." : "GOOGLE SIGN IN"}
                 </button>
@@ -660,7 +672,10 @@ export default function LandingPage({
             </div>
             <button
               onClick={() => setShowTermsModal(false)}
-              className="w-full mt-6 bg-smirkleMint text-black font-black text-xl py-3 border-4 border-black shadow-brutal hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
+              className={cn(
+                "w-full mt-6 bg-smirkleMint text-black font-black text-xl py-3 border-4 border-black shadow-brutal",
+                "hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
+              )}
             >
               I AGREE (LET ME PLAY)
             </button>
